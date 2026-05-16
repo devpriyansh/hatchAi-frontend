@@ -35,26 +35,26 @@ export default function IDE() {
 
   // Start a new preview server (static or framework)
   const startPreviewServer = useCallback(async () => {
-    setIsPreviewLoading(true);
-    setPreviewError(null);
-    try {
-      const { data } = await axios.post(`${BACKEND_URL}/preview/start`);
-      if (data.success) {
-        const baseUrl = data.previewUrl;
-        setPreviewBaseUrl(baseUrl);
-        return baseUrl;
-      } else {
-        throw new Error(data.message || 'Failed to start preview');
-      }
-    } catch (error) {
-      const msg = error.response?.data?.message || error.message;
-      setPreviewError(msg);
-      return null;
-    } finally {
-      setIsPreviewLoading(false);
+  setIsPreviewLoading(true);
+  setPreviewError(null);
+  try {
+    const { data } = await axios.post(`${BACKEND_URL}/preview/start`);
+    if (data.success) {
+      const port = data.previewPort;                     // <-- use previewPort
+      const baseUrl = `${BACKEND_URL}/preview/${port}`;  // build the proxy URL
+      setPreviewBaseUrl(baseUrl);
+      return baseUrl;                                   // return the full base URL
+    } else {
+      throw new Error(data.message || 'Failed to start preview');
     }
-  }, []);
-
+  } catch (error) {
+    const msg = error.response?.data?.message || error.message;
+    setPreviewError(msg);
+    return null;
+  } finally {
+    setIsPreviewLoading(false);
+  }
+}, []);
   // When a file is selected, prepare the preview URL (does not start it yet)
   // const handleSelectFile = useCallback(
   //   async (file) => {
@@ -78,25 +78,23 @@ export default function IDE() {
   //   [previewBaseUrl, startPreviewServer]
   // );
 
-  const handleSelectFile = useCallback(async (file) => {
+ const handleSelectFile = useCallback(async (file) => {
   setSelectedFile(file);
   if (!file || !file.endsWith('.html')) {
     setPreviewUrl('about:blank');
     return;
   }
 
-  let base = previewBaseUrl;
+  let base = previewBaseUrl;                // may be null
   if (!base) {
-    const result = await startPreviewServer(); // now returns { previewPort }
-    if (!result) return;
-    base = `${BACKEND_URL}/preview/${result.previewPort}`; // like http://backend.com/preview/5432
-    setPreviewBaseUrl(base);
+    base = await startPreviewServer();      // now returns e.g. "https://.../preview/5432"
+    if (!base) return;                      // error already shown
+    // setPreviewBaseUrl is already called inside startPreviewServer
   }
 
-  const finalUrl = `${base}/${file}`;
+  const finalUrl = `${base}/${file}`;       // e.g. https://.../preview/5432/index.html
   setPreviewUrl(finalUrl);
-}, [previewBaseUrl]);
-
+}, [previewBaseUrl, startPreviewServer]);
 
   // Refresh preview (force reload)
   const handleRefreshPreview = () => {
